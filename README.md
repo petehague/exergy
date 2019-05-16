@@ -1,7 +1,9 @@
 Exergy
 ======
 
-Exergy is a BASIC intepreter that can be used through a browser. At this very early stage, only two commands are implemented
+This is a pet project whose primary purpose is to help me learn Go.
+
+Exergy is a BASIC interpreter that can be used through a browser. At this very early stage, only two commands are implemented
 
 * print - prints out the expression that follows
 * clear - clears the window
