@@ -1,0 +1,41 @@
+<html>
+<head>
+  <script type="text/javascript">
+    function setCursor() {
+      document.getElementById("entry").focus();
+    }
+  </script>
+
+  <style>
+  body {
+    background-color: #EEEEEE;
+    font-family: monospace;
+  }
+
+  #entry {
+    border: 0px;
+    background-color: #DDDDFF;
+    width: 100%;
+    font-family: monospace;
+    font-weight: bold;
+  }
+
+  #entry:focus {
+    outline-width: 0;
+  }
+
+  .statement {
+    color: #3333FF;
+    display: inline;
+  }
+  </style>
+</head>
+
+<body onload="setCursor()">
+  {{.Textcontent}}
+  <form action='/' method='GET' autocomplete='off'>
+    <input name='p' type='hidden' value='{{.Ptag}}' />
+    <input name='cmd' type='text' id="entry"/>
+  </form>
+</body>
+</html>
