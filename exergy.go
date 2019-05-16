@@ -6,7 +6,6 @@
   TODO:
     - Fix the page tag in the URL (proper encoding)
     - Make sure that page requests are idempotent
-    - Add the LET command, and variables
 */
 
 package main
@@ -26,6 +25,7 @@ import (
 var operatorPrec =  "^ / * - + ("
 var outputBuffer =  "Exergy BASIC<br /><br />V0.1<br /><br />"
 var lineCount = 0
+var variables = make(map[string]float64)
 
 type outputFrame struct {
   Textcontent string
@@ -95,24 +95,33 @@ func evaluate(expression string) (float64, error) {
     if x := strings.Index("0123456789.", string(t[0])); x>-1 {
       val, _ := strconv.ParseFloat(t,64)
       stack = append(stack, val)
-    }
-    switch t[0] {
-      case '+':
-        result := stack[len(stack)-2]+stack[len(stack)-1]
-        stack = stack[:len(stack)-2]
-        stack = append(stack, result)
-      case '*':
-        result := stack[len(stack)-2]*stack[len(stack)-1]
-        stack = stack[:len(stack)-2]
-        stack = append(stack, result)
-      case '-':
-        result := stack[len(stack)-2]-stack[len(stack)-1]
-        stack = stack[:len(stack)-2]
-        stack = append(stack, result)
-      case '/':
-        result := stack[len(stack)-2]/stack[len(stack)-1]
-        stack = stack[:len(stack)-2]
-        stack = append(stack, result)
+    } else {
+      switch t[0] {
+        case '+':
+          result := stack[len(stack)-2]+stack[len(stack)-1]
+          stack = stack[:len(stack)-2]
+          stack = append(stack, result)
+        case '*':
+          result := stack[len(stack)-2]*stack[len(stack)-1]
+          stack = stack[:len(stack)-2]
+          stack = append(stack, result)
+        case '-':
+          result := stack[len(stack)-2]-stack[len(stack)-1]
+          stack = stack[:len(stack)-2]
+          stack = append(stack, result)
+        case '/':
+          result := stack[len(stack)-2]/stack[len(stack)-1]
+          stack = stack[:len(stack)-2]
+          stack = append(stack, result)
+        default:
+          value, present := variables[t]
+          fmt.Printf("%s, %f\n",t,value)
+          if present {
+            stack = append(stack, value)
+          } else {
+            return 0,NewErrSyntax("No such variable")
+          }
+      }
     }
   }
   return stack[len(stack)-1], nil
@@ -131,12 +140,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
         case "clear":
           outputBuffer = ""
         case "print":
-          rp_expr, err := exprParse(statement)
-          result, err := evaluate(rp_expr)
+          rp_expr, err := exprParse(tokens[1])
+
           if (err != nil) {
             outputBuffer += err.Error()+"<br />"
           } else {
-            outputBuffer += fmt.Sprintf("%f", result)+"<br />"
+            result, err := evaluate(rp_expr)
+            if (err != nil) {
+              outputBuffer += err.Error()+"<br />"
+            } else {
+              outputBuffer += fmt.Sprintf("%f", result)+"<br />"
+            }
+          }
+        case "let":
+          i := strings.Index(tokens[1],"=")
+          result, err := exprParse(tokens[1][i+1:])
+          if (err != nil) {
+            outputBuffer += err.Error()+"<br />"
+          } else {
+            variables[tokens[1][:i]],_ = strconv.ParseFloat(result, 64)
           }
         default:
           outputBuffer += "Command not regonised<br />"
