@@ -26,6 +26,7 @@ var operatorPrec =  "^ / * - + ("
 var outputBuffer =  "Exergy BASIC<br /><br />V0.1<br /><br />"
 var lineCount = 0
 var variables = make(map[string]float64)
+var newSession = 1
 
 type outputFrame struct {
   Textcontent string
@@ -130,6 +131,10 @@ func evaluate(expression string) (float64, error) {
 //Handle the HTTP requests
 func handler(w http.ResponseWriter, r *http.Request) {
     statement := r.URL.Query().Get("cmd")
+    if newSession==1 {
+      statement = ""
+      newSession = 0
+    }
 
     if statement!="" {
       lineCount += 1
@@ -153,15 +158,27 @@ func handler(w http.ResponseWriter, r *http.Request) {
             }
           }
         case "let":
-          i := strings.Index(tokens[1],"=")
-          result, err := exprParse(tokens[1][i+1:])
+          letExpr := strings.Join(tokens[1:],"")
+          i := strings.Index(letExpr,"=")
+          result, err := exprParse(letExpr[i+1:])
           if (err != nil) {
             outputBuffer += err.Error()+"<br />"
           } else {
-            variables[tokens[1][:i]],_ = strconv.ParseFloat(result, 64)
+            variables[letExpr[:i]],_ = evaluate(result)
           }
         default:
-          outputBuffer += "Command not regonised<br />"
+          vname := strings.Split(strings.Join(tokens,""),"=")
+          if _, ok := variables[vname[0]]; ok {
+              varExpr := strings.Join(vname[1:],"")
+              result, err := exprParse(varExpr)
+              if (err != nil) {
+                outputBuffer += err.Error()+"<br />"
+              } else {
+                variables[vname[0]],_ = evaluate(result)
+              }
+          } else {
+            outputBuffer += "Command not recognised<br />"
+          }
       }
 
 
