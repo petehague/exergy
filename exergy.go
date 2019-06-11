@@ -28,6 +28,8 @@ var lineCount = 0
 var variables = make(map[string]float64)
 var newSession = 1
 var loopLevel = 0
+var loopLimit float64 = 0
+var loopCounter = ""
 var programStack []string
 
 type outputFrame struct {
@@ -193,12 +195,30 @@ func statementHandler(statement string, blind bool) {
             variables[letExpr[:i]],_ = evaluate(result)
           }
         case "for":
+          forarg := strings.Join(tokens[1:],"")
+          firstsplit := strings.Split(forarg , "=")
+          secondsplit := strings.Split(forarg, "to")
+          loopCounter = firstsplit[0]
+          result, err := exprParse(secondsplit[0])
+          if err != nil {
+            outputBuffer += err.Error()+"<br />"
+            return
+          }
+          variables[loopCounter], _ = evaluate(result)
+
+          result, err = exprParse(secondsplit[1])
+          if err != nil {
+            outputBuffer += err.Error()+"<br />"
+            return
+          }
+          loopLimit,_ = evaluate(result)
           loopLevel += 1
         case "next":
-          for i:=0;i<10;i++ {
+          for variables[loopCounter]<loopLimit {
             for _,loopStatement := range(programStack) {
               statementHandler(loopStatement, true)
             }
+            variables[loopCounter] += 1
           }
           programStack = nil
         default:
