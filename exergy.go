@@ -27,6 +27,8 @@ var outputBuffer =  "Exergy BASIC<br /><br />V0.1<br /><br />"
 var lineCount = 0
 var variables = make(map[string]float64)
 var newSession = 1
+var loopLevel = 0
+var programStack []string
 
 type outputFrame struct {
   Textcontent string
@@ -131,6 +133,22 @@ func evaluate(expression string) (float64, error) {
 //Handle the HTTP requests
 func handler(w http.ResponseWriter, r *http.Request) {
     statement := r.URL.Query().Get("cmd")
+    statementHandler(statement, false)
+
+    p := md5.Sum([]byte(fmt.Sprintf("exergy%s%f",statement,lineCount)))
+    newpage := outputFrame{outputBuffer, p}
+
+    pagetemplate, err := ioutil.ReadFile("mainpage.html")
+    tmpl, err := template.New("Output").Parse(string(pagetemplate))
+
+    if (err == nil) {
+      tmpl.Execute(w, newpage)
+    } else {
+      panic(err)
+    }
+}
+
+func statementHandler(statement string, blind bool) {
     if newSession==1 {
       statement = ""
       newSession = 0
@@ -138,20 +156,28 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
     if statement!="" {
       lineCount += 1
-      outputBuffer += fmt.Sprintf("<div class='statement'>%s</div><br />", statement)
+      if !blind {
+        outputBuffer += fmt.Sprintf("<div class='statement'>%s</div><br />", statement)
+      }
 
       tokens := strings.Split(statement, " ")
+
+      if tokens[0]=="next" {
+        loopLevel -=1
+      }
+
+      if loopLevel==0 {
       switch tokens[0] {
         case "clear":
           outputBuffer = ""
         case "print":
           rp_expr, err := exprParse(tokens[1])
 
-          if (err != nil) {
+          if err != nil {
             outputBuffer += err.Error()+"<br />"
           } else {
             result, err := evaluate(rp_expr)
-            if (err != nil) {
+            if err != nil {
               outputBuffer += err.Error()+"<br />"
             } else {
               outputBuffer += fmt.Sprintf("%f", result)+"<br />"
@@ -161,11 +187,20 @@ func handler(w http.ResponseWriter, r *http.Request) {
           letExpr := strings.Join(tokens[1:],"")
           i := strings.Index(letExpr,"=")
           result, err := exprParse(letExpr[i+1:])
-          if (err != nil) {
+          if err != nil {
             outputBuffer += err.Error()+"<br />"
           } else {
             variables[letExpr[:i]],_ = evaluate(result)
           }
+        case "for":
+          loopLevel += 1
+        case "next":
+          for i:=0;i<10;i++ {
+            for _,loopStatement := range(programStack) {
+              statementHandler(loopStatement, true)
+            }
+          }
+          programStack = nil
         default:
           vname := strings.Split(strings.Join(tokens,""),"=")
           if _, ok := variables[vname[0]]; ok {
@@ -180,21 +215,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
             outputBuffer += "Command not recognised<br />"
           }
       }
-
-
+      } else {
+        programStack = append(programStack, statement)
+      }
     }
 
-    p := md5.Sum([]byte(fmt.Sprintf("exergy%s%f",statement,lineCount)))
-    newpage := outputFrame{outputBuffer, p}
 
-    pagetemplate, err := ioutil.ReadFile("mainpage.html")
-    tmpl, err := template.New("Output").Parse(string(pagetemplate))
-
-    if (err == nil) {
-      tmpl.Execute(w, newpage)
-    } else {
-      panic(err)
-    }
 }
 
 func main() {
